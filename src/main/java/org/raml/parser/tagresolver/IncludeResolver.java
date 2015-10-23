@@ -21,7 +21,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 import org.raml.parser.loader.ResourceLoader;
-import org.raml.parser.utils.StreamUtils;
 import org.raml.parser.visitor.NodeHandler;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.nodes.Node;
@@ -75,9 +74,7 @@ public class IncludeResolver implements TagResolver, ContextPathAware
         }
         else //scalar value
         {
-            //String newValue = IOUtils.toString(inputStream);
-            String newValue = StreamUtils.toString(inputStream);
-            includeNode = new IncludeScalarNode(resourceName, newValue, scalarNode);
+            includeNode = new IncludeScalarNode(resourceName, resourceName, scalarNode);
         }
         if (includeNode == null)
         {

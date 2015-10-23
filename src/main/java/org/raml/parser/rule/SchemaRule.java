@@ -23,7 +23,7 @@ import static org.raml.parser.tagresolver.IncludeResolver.IncludeScalarNode;
 import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.github.fge.jackson.JsonLoader;
+import com.github.fge.jackson.JsonNodeReader;
 import com.github.fge.jsonschema.SchemaVersion;
 import com.github.fge.jsonschema.cfg.ValidationConfiguration;
 import com.github.fge.jsonschema.core.report.ProcessingMessage;
@@ -31,6 +31,7 @@ import com.github.fge.jsonschema.core.report.ProcessingReport;
 import com.github.fge.jsonschema.processors.syntax.SyntaxValidator;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.util.List;
 
@@ -45,6 +46,7 @@ import org.raml.parser.loader.ResourceLoaderAware;
 import org.raml.parser.tagresolver.ContextPath;
 import org.raml.parser.tagresolver.ContextPathAware;
 import org.raml.parser.utils.NodeUtils;
+import org.apache.commons.io.IOUtils;
 import org.raml.parser.visitor.IncludeInfo;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -54,6 +56,7 @@ public class SchemaRule extends SimpleRule implements ContextPathAware, Resource
 {
 
     private static final SyntaxValidator VALIDATOR = new SyntaxValidator(ValidationConfiguration.newBuilder().setDefaultVersion(SchemaVersion.DRAFTV3).freeze());
+    private static final JsonNodeReader JSON_NODE_READER = new JsonNodeReader();
     private ContextPath contextPath;
     private ResourceLoader resourceLoader;
 
@@ -92,9 +95,17 @@ public class SchemaRule extends SimpleRule implements ContextPathAware, Resource
         String mimeType = ((ScalarNode) getParentTupleRule().getKey()).getValue();
         if (mimeType.contains("json"))
         {
+            InputStream inputStream = null;
             try
             {
-                JsonNode jsonNode = JsonLoader.fromString(value);
+                inputStream = resourceLoader.fetchResource(value);
+
+                if (inputStream == null)
+                {
+                    inputStream = IOUtils.toInputStream(value);
+                }
+
+                JsonNode jsonNode = JSON_NODE_READER.fromInputStream(inputStream);
                 ProcessingReport report = VALIDATOR.validateSchema(jsonNode);
                 if (!report.isSuccess())
                 {
@@ -117,6 +128,10 @@ public class SchemaRule extends SimpleRule implements ContextPathAware, Resource
             {
                 String prefix = "invalid JSON schema" + getSourceErrorDetail(node);
                 validationResults.add(getErrorResult(prefix + e.getMessage(), UNKNOWN, globaSchemaIncludeInfo));
+            } 
+            finally
+            {
+				IOUtils.closeQuietly(inputStream);
             }
         }
         else if (mimeType.contains("xml"))
